@@ -37,7 +37,7 @@ export default function SinglePost({
               />
             </div>
           </div>
-          <span className="font-semibold text-sm">username</span>
+          <span className="font-semibold text-sm">rehan_hansaja</span>
         </div>
         <button
           onClick={() => deletePostClicked({ id })}
@@ -99,7 +99,7 @@ export default function SinglePost({
 
         {/* Caption */}
         <p className="text-sm">
-          <span className="font-semibold mr-2">username</span>
+          <span className="font-semibold mr-2">rehan_hansaja</span>
           {caption}
         </p>
 
@@ -114,7 +114,7 @@ export default function SinglePost({
 
         {/* Date */}
         <p className="text-[10px] text-gray-400 uppercase tracking-wide mt-1">
-          {new Date(created).toLocaleDateString()}
+          {new Date(created).toLocaleDateString("en-US")}
         </p>
       </div>
     </div>
