@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { getPosts, Post } from "../server/posts";
+import axios from "axios";
 
 import SinglePost from "../components/SinglePost";
 import NavBar from "../components/NavBar";
@@ -18,8 +19,13 @@ function App(props: AppProps) {
     console.log(`commentClicked = (${id})`);
   };
   const deletePostClicked = async ({ id }: { id: string | number }) => {
-    console.log(`deletePostClicked = (${id})`);
-    setPosts(posts.filter((post) => post.id !== id));
+    try {
+      await axios.delete(`/api/posts/${id}`);
+      setPosts(posts.filter((post) => post.id !== id));
+    } catch (error) {
+      console.error("Failed to delete post", error);
+      alert("Failed to delete post");
+    }
   };
 
   const postActions = {
