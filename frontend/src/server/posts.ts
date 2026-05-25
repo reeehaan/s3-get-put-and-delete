@@ -1,5 +1,11 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocument } from "@aws-sdk/lib-dynamodb";
+import {
+  DynamoDBDocumentClient,
+  PutCommand,
+  ScanCommand,
+  DeleteCommand,
+  GetCommand,
+} from "@aws-sdk/lib-dynamodb";
 import { uploadFile, getObjectSignedUrl, deleteFile } from "./s3";
 import { v4 as uuidv4 } from "uuid";
 import sharp from "sharp";
@@ -24,7 +30,7 @@ const client = new DynamoDBClient({
 });
 
 //warp it Document client, instead passing wired aws data type helps to pass JSON objects
-const ddbDocClient = DynamoDBDocument.from(client);
+const ddbDocClient = DynamoDBDocumentClient.from(client);
 
 const TABLE_NAME = process.env.DYNAMODB_TABLE_NAME as string;
 
@@ -33,16 +39,68 @@ const generateFileName = (bytes = 32) =>
   crypto.randomBytes(bytes).toString("hex");
 
 export async function getPosts(): Promise<Post[]> {
-  // TODO: Implement getPosts from DynamoDB
-  return [];
+  const params = {
+    TableName: TABLE_NAME,
+  };
+
+  try {
+    //ask dynamodb for the data
+    const data = await ddbDocClient.send(new ScanCommand(params));
+
+    //Typecast returned it for what are they
+    const posts = (data.Items as Post[]) || [];
+
+    //Sort the posts by date (newest first)
+    // (DynamoDB 'Scan' returns data in random order, so we sort it here)
+    posts.sort(
+      (a, b) => new Date(b.created).getTime() - new Date(a.created).getTime(),
+    );
+
+    for (const post of posts) {
+      post.imageUrl = await getObjectSignedUrl(post.imageName);
+    }
+    return posts;
+  } catch (err) {
+    console.error("Error getting posts from DynamoDB:", err);
+    return [];
+  }
 }
 
 export async function createPost(
   file: { buffer: Buffer; mimetype: string },
   caption: string,
 ): Promise<Post | null> {
-  // TODO: Implement createPost using DynamoDB and S3
-  return null;
+  const imageName = generateFileName();
+
+  //resize and compress image using sharp
+  const fileBuffer = await sharp(file.buffer)
+    .resize({ height: 1920, width: 1080, fit: "contain" })
+    .toBuffer();
+
+  //upload image to s3
+  await uploadFile(fileBuffer, imageName, file.mimetype);
+
+  //create post obj into dynamoDB
+  const post: Post = {
+    id: uuidv4(),
+    imageName: imageName,
+    caption: caption,
+    totalComments: 0,
+    totalLikes: 0,
+    created: new Date().toString(),
+  };
+
+  // save post obj into dynamoDB
+  const params = {
+    TableName: TABLE_NAME,
+    Item: post,
+  };
+  await ddbDocClient.send(new PutCommand(params));
+
+  //grab sec url right now so frontend ca display it immediately
+  post.imageUrl = await getObjectSignedUrl(imageName);
+
+  return post;
 }
 
 export async function deletePost(id: string | number): Promise<Post | null> {
