@@ -104,6 +104,27 @@ export async function createPost(
 }
 
 export async function deletePost(id: string | number): Promise<Post | null> {
-  // TODO: Implement deletePost using DynamoDB and S3
-  return null;
+  // 1. First, we need to get the post from DynamoDB so we know what the `imageName` is.
+  // (We can't delete the image from S3 if we don't know its name!)
+  const getParams = {
+    TableName: TABLE_NAME,
+    Key: { id },
+  };
+
+  const data = await ddbDocClient.send(new GetCommand(getParams));
+  const post = data.Item as Post | undefined;
+
+  if (!post) {
+    return null;
+  }
+  //delete actual image file from s3 bucket
+  await deleteFile(post.imageName);
+
+  //delete metadata from dynamodb table
+  const deleteParams = {
+    TableName: TABLE_NAME,
+    Key: { id },
+  };
+  await ddbDocClient.send(new DeleteCommand(deleteParams));
+  return post;
 }
